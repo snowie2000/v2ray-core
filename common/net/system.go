@@ -1,6 +1,9 @@
 package net
 
-import "net"
+import (
+	"context"
+	"net"
+)
 
 // DialTCP is an injectable function. Default to net.DialTCP
 var DialTCP = net.DialTCP
@@ -57,3 +60,24 @@ type UnixListener = net.UnixListener
 var ResolveUnixAddr = net.ResolveUnixAddr
 
 type Resolver = net.Resolver
+
+func init() {
+	net.DefaultResolver = &net.Resolver{
+		PreferGo: false,
+		Dial: func(ctx context.Context, network, server string) (net.Conn, error) {
+			// Calling Dial here is scary -- we have to be sure not to
+			// dial a name that will require a DNS lookup, or Dial will
+			// call back here to translate it. The DNS config parser has
+			// already checked that all the cfg.servers are IP
+			// addresses, which Dial will use without a DNS lookup.
+			var c net.Conn
+			var err error
+			var d net.Dialer
+			c, err = d.DialContext(ctx, "tcp", server)
+			if err != nil {
+				return nil, err
+			}
+			return c, nil
+		},
+	}
+}
